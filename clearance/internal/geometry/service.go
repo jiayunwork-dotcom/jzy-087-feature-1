@@ -37,7 +37,14 @@ func Evaluate(aPts, bPts []Vec2) (*Result, error) {
 	if err != nil {
 		return nil, namedError("B", err.(*KernelError))
 	}
+	return evaluatePair(a, b)
+}
 
+// evaluatePair is the kernel proper on two already-validated polygons:
+// GJK on the Minkowski difference, then the separation or penetration
+// branch. The sweep layer calls it on translated copies of polygons it
+// has already validated (translation preserves validity).
+func evaluatePair(a, b *Polygon) (*Result, error) {
 	st, err := gjk(a, b)
 	if err != nil {
 		return nil, err

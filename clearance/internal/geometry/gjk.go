@@ -49,6 +49,27 @@ func gjk(a, b *Polygon) (*gjkState, error) {
 			}
 			return &gjkState{contained: false, simplex: simplex, steps: step}, nil
 		}
+
+		// No-progress termination: if the new support point does not reach
+		// past the current simplex along d, the simplex's supporting plane
+		// already bounds the whole CSO toward the origin, so the current
+		// feature is the closest one. Tied support directions can
+		// otherwise cycle forever: the support keeps returning a tied
+		// vertex that the simplex evolution immediately discards (e.g.
+		// vertex-vertex closest pairs separated exactly along an axis),
+		// and the exact-duplicate check above never fires.
+		proj := sp.V.Dot(d)
+		best := simplex[0].V.Dot(d)
+		for _, s := range simplex[1:] {
+			if p := s.V.Dot(d); p > best {
+				best = p
+			}
+		}
+		if proj <= best+tol*d.Len() {
+			// Boundary contact (distance <= tol) is routed to EPA by the
+			// caller's guard, exactly as for the duplicate exit.
+			return &gjkState{contained: false, simplex: simplex, steps: step}, nil
+		}
 		simplex = append([]SupportPoint{sp}, simplex...)
 
 		switch len(simplex) {

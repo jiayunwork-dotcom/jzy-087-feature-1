@@ -183,3 +183,45 @@ func clamp01(t float64) float64 {
 	}
 	return t
 }
+
+// TestGJKTiedSupportDirectionsTerminate is a regression test for a
+// termination gap in the simplex iteration: when the closest feature is a
+// vertex-vertex pair separated exactly along an axis, the support function
+// keeps returning a tied vertex that the simplex evolution immediately
+// discards, so the exact-duplicate exit never fires. The no-progress
+// termination must cut the cycle and return the correct gap.
+func TestGJKTiedSupportDirectionsTerminate(t *testing.T) {
+	cases := []struct {
+		name       string
+		a, b       []Vec2
+		wantDist   float64
+		wantNormal Vec2
+	}{
+		// Closest corners (1,0) and (1.5,0): identical y, axis-aligned gap.
+		{"corner pair aligned in y", rect(0, 0, 1, 1), rect(1.5, -1, 2.5, 0), 0.5, Vec2{1, 0}},
+		// Closest corners (1,0) and (1,-1): identical x, axis-aligned gap.
+		{"corner pair aligned in x", rect(0, 0, 1, 1), rect(1, -2, 2, -1), 1, Vec2{0, -1}},
+		// Identical y intervals, edge-to-edge gap along x.
+		{"edges with matching y range", rect(0, 0, 1, 1), rect(1.5, 0, 2.5, 1), 0.5, Vec2{1, 0}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			res, err := Evaluate(tc.a, tc.b)
+			if err != nil {
+				t.Fatalf("evaluate: %v", err)
+			}
+			if res.Status != StatusSeparated {
+				t.Fatalf("status = %s, want separated", res.Status)
+			}
+			if !approxEq(res.Distance, tc.wantDist, exactGapTol) {
+				t.Fatalf("distance = %.15g, want %.15g", res.Distance, tc.wantDist)
+			}
+			if !vecEq(res.Normal, tc.wantNormal, exactGapTol) {
+				t.Fatalf("normal = %v, want %v", res.Normal, tc.wantNormal)
+			}
+			if res.Iterations <= 0 || res.Iterations > MaxGJKIterations {
+				t.Fatalf("iterations out of bounds: %d", res.Iterations)
+			}
+		})
+	}
+}

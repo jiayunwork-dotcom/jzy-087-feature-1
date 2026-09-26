@@ -33,8 +33,11 @@ func epa(a, b *Polygon, seed []SupportPoint, gjkSteps int) (*epaContact, error) 
 	tol := epsFor(a.maxLen(), b.maxLen())
 	verts := bootstrapPolytope(a, b, seed, tol)
 	if verts == nil {
-		return nil, &KernelError{Code: ErrEPAFailure,
-			Message: "EPA could not build a polytope enclosing the origin"}
+		// GJK containment is a tolerance decision: the origin can sit
+		// within tol OUTSIDE the CSO boundary, where no support polytope
+		// strictly encloses it. That is boundary contact, not a kernel
+		// failure — resolve it from the closest CSO feature.
+		return boundaryContact(a, b, seed, tol, gjkSteps)
 	}
 
 	stopGap := convergenceRel * polytopeScale(verts)
@@ -69,6 +72,64 @@ func epa(a, b *Polygon, seed []SupportPoint, gjkSteps int) (*epaContact, error) 
 	}
 	return nil, &KernelError{Code: ErrEPANoConvergence,
 		Message: "EPA polytope expansion did not converge within the step budget"}
+}
+
+// boundaryContact resolves the degenerate band where GJK reports the origin
+// as (tolerantly) contained but no support polytope strictly encloses it:
+// the origin lies within the containment tolerance of the CSO boundary, so
+// the parts are in boundary contact. The contact is described by the hull
+// feature closest to the origin, with depth 0. A genuinely distant origin
+// would mean the GJK verdict cannot be reconciled — only that is reported
+// as EPA_FAILURE.
+func boundaryContact(a, b *Polygon, seed []SupportPoint, tol float64, gjkSteps int) (*epaContact, error) {
+	verts := dedupe(seed, tol)
+	for _, d := range []Vec2{
+		{X: 1}, {Y: 1}, {X: -1}, {Y: -1},
+		{X: 1, Y: 1}, {X: 1, Y: -1}, {X: -1, Y: 1}, {X: -1, Y: -1},
+	} {
+		verts = appendUnique(verts, support(a, b, d), tol)
+	}
+	hull := convexHull(verts, tol)
+
+	// Closest hull boundary feature to the origin, with witnesses.
+	bestD := math.Inf(1)
+	var bestN, bestA, bestB Vec2
+	for i := 0; i < len(hull); i++ {
+		s1, s2 := hull[i], hull[(i+1)%len(hull)]
+		e := s2.V.Sub(s1.V)
+		t := 0.0
+		if e.Len2() > 0 {
+			t = clampUnit(s1.V.Scale(-1).Dot(e) / e.Len2())
+		}
+		q := s1.V.Add(e.Scale(t))
+		if d := q.Len(); d < bestD {
+			bestD = d
+			switch {
+			case d > 0:
+				// From the closest CSO point toward the origin: the
+				// direction B must move to separate the parts.
+				bestN = q.Scale(-1).Normalized()
+			case e.Len2() > 0:
+				// Origin exactly on the edge: use the outward edge normal.
+				bestN = e.PerpLeft().Normalized().Scale(-1)
+			default:
+				bestN = Vec2{X: 1}
+			}
+			bestA = s1.Pa.Add(s2.Pa.Sub(s1.Pa).Scale(t))
+			bestB = s1.Pb.Add(s2.Pb.Sub(s1.Pb).Scale(t))
+		}
+	}
+	if bestD > 100*tol {
+		return nil, &KernelError{Code: ErrEPAFailure,
+			Message: "EPA could not build a polytope enclosing the origin"}
+	}
+	return &epaContact{
+		depth:  0,
+		normal: bestN,
+		pointA: bestA,
+		pointB: bestB,
+		steps:  gjkSteps,
+	}, nil
 }
 
 // bootstrapPolytope turns a 1-, 2- or 3-point origin-containing simplex into
