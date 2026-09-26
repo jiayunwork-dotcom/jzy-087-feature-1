@@ -19,6 +19,9 @@ const (
 	ErrEPANoConvergence = "EPA_NO_CONVERGENCE"
 	// ErrEPAFailure: no usable closest edge could be derived.
 	ErrEPAFailure = "EPA_FAILURE"
+	// ErrSweepNoConvergence: sweep root finding / bisection hit its step
+	// budget without converging to the contact tolerance.
+	ErrSweepNoConvergence = "SWEEP_NO_CONVERGENCE"
 )
 
 // KernelError is a classified error produced by the geometric kernel.
