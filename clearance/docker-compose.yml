@@ -1,0 +1,19 @@
+# One-command startup:
+#   docker compose up --build
+# Then query:
+#   curl -s localhost:8080/health
+#   curl -s -X POST localhost:8080/collide \
+#     -H 'Content-Type: application/json' \
+#     -d @examples/known_gap.json
+services:
+  clearance:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: clearance-svc:latest
+    container_name: clearance-svc
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+    restart: unless-stopped
