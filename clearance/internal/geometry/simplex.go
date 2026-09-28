@@ -154,3 +154,50 @@ func clampUnit(t float64) float64 {
 		return t
 	}
 }
+
+// closestSimplexPoint returns the point of a one- or two-vertex simplex
+// nearest the origin. evolveLine keeps the active simplex in one of these
+// two forms (a degenerate triangle is reduced first). It is safe at zero
+// distance (it never normalizes the residual).
+func closestSimplexPoint(s []SupportPoint, tol float64) Vec2 {
+	if len(s) == 1 {
+		return s[0].V
+	}
+	p, q := s[0].V, s[1].V
+	e := q.Sub(p)
+	t := 0.0
+	if e.Len2() > tol*tol {
+		t = clampUnit(p.Scale(-1).Dot(e) / e.Len2())
+	}
+	return p.Add(e.Scale(t))
+}
+
+// onClosestFeature reports whether the support point sp already lies on the
+// current closest feature of the simplex:
+//
+//   - one-point simplex: sp coincides with that vertex;
+//   - two-point simplex: sp coincides with an endpoint or lies ON the
+//     segment (within the tolerance).
+//
+// Retained as an exact structural duplicate test; the main GJK loop relies on
+// the (more general) support-projection progress test for termination.
+func onClosestFeature(sp SupportPoint, s []SupportPoint, tol float64) bool {
+	if duplicatesAny(sp, s, tol) {
+		return true
+	}
+	if len(s) != 2 {
+		return false
+	}
+	p, q := s[0].V, s[1].V
+	e := q.Sub(p)
+	if e.Len2() <= tol*tol {
+		return false
+	}
+	// Distance from sp.V to the supporting line of the segment...
+	n := e.PerpLeft()
+	lineDist := math.Abs(n.Dot(sp.V.Sub(p))) / e.Len()
+	// ...and it must project inside the segment span.
+	t := clampUnit(sp.V.Sub(p).Dot(e) / e.Len2())
+	inSpan := sp.V.Sub(p.Add(e.Scale(t))).Len() <= tol
+	return lineDist <= tol && inSpan
+}

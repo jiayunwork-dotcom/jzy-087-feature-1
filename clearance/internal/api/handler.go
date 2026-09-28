@@ -37,6 +37,7 @@ func Router() *gin.Engine {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 	r.POST("/collide", handleCollide)
+	r.POST("/sweep", handleSweep)
 	return r
 }
 
@@ -93,8 +94,9 @@ func writeKernelError(c *gin.Context, err error) {
 	var ke *geometry.KernelError
 	if errors.As(err, &ke) {
 		status := http.StatusBadRequest
-		if ke.Code == geometry.ErrGJKNoConvergence || ke.Code == geometry.ErrEPANoConvergence ||
-			ke.Code == geometry.ErrEPAFailure {
+		switch ke.Code {
+		case geometry.ErrGJKNoConvergence, geometry.ErrEPANoConvergence,
+			geometry.ErrEPAFailure, geometry.ErrSweepNoConvergence:
 			status = http.StatusUnprocessableEntity
 		}
 		c.JSON(status, errorResponse{Code: ke.Code, Message: ke.Message})

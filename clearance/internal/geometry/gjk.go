@@ -40,11 +40,26 @@ func gjk(a, b *Polygon) (*gjkState, error) {
 		}
 		sp := support(a, b, d)
 
-		// The support point must make progress toward the origin along d.
-		// If it is already part of the simplex, the closest feature has
-		// been reached and the origin stays outside.
-		if duplicatesAny(sp, simplex, tol) {
-			if sp.V.Len() <= tol {
+		// Termination by the support-progress test. Let q be the point of
+		// the current closest feature nearest the origin and d the search
+		// direction (q -> origin). The CSO is convex, so every point of it,
+		// including the new support point sp, satisfies
+		//
+		//	sp·d_hat <= q·d_hat
+		//
+		// (sp cannot lie farther toward the origin than the closest feature
+		// supporting the half-space). Equality up to the geometric tolerance
+		// means q already is the closest point of the CSO: the origin stays
+		// outside and no further simplex evolution can reduce the distance.
+		//
+		// This single test subsumes the duplicate-vertex test and, crucially,
+		// the finite-precision stalls where a tiny component of the search
+		// direction resolves a distant support vertex whose projection is
+		// behind the origin (the exact-vertex test would then cycle forever).
+		q := closestSimplexPoint(simplex, tol)
+		progress := sp.V.Sub(q).Dot(d.Normalized())
+		if progress <= tol || onClosestFeature(sp, simplex, tol) {
+			if q.Len() <= tol {
 				return &gjkState{contained: true, simplex: simplex, steps: step}, nil
 			}
 			return &gjkState{contained: false, simplex: simplex, steps: step}, nil
