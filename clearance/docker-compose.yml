@@ -5,6 +5,9 @@
 #   curl -s -X POST localhost:8080/collide \
 #     -H 'Content-Type: application/json' \
 #     -d @examples/known_gap.json
+#   curl -s -X POST localhost:8080/sweep \
+#     -H 'Content-Type: application/json' \
+#     -d @examples/sweep_contact.json
 services:
   clearance:
     build:

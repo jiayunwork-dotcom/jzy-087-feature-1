@@ -1,6 +1,7 @@
 // Command clearance-svc serves the assembly-clearance geometric kernel over
-// HTTP. It exposes no UI: POST /collide with two convex polygons returns the
-// separation or penetration result.
+// HTTP. It exposes no UI: POST /collide answers the static single-frame query
+// for two convex polygons and POST /sweep answers the constant-velocity
+// swept query (time of impact / closest approach over t in [0,1]).
 package main
 
 import (

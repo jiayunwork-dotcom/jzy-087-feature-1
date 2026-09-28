@@ -19,6 +19,11 @@ const (
 	ErrEPANoConvergence = "EPA_NO_CONVERGENCE"
 	// ErrEPAFailure: no usable closest edge could be derived.
 	ErrEPAFailure = "EPA_FAILURE"
+	// ErrNonFiniteVelocity: a sweep velocity component is NaN / ±Inf.
+	ErrNonFiniteVelocity = "NON_FINITE_VELOCITY"
+	// ErrSweepNoConvergence: the swept conservative advancement did not
+	// converge to the contact tolerance within its step budget.
+	ErrSweepNoConvergence = "SWEEP_NO_CONVERGENCE"
 )
 
 // KernelError is a classified error produced by the geometric kernel.
